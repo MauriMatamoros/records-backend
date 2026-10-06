@@ -1,0 +1,26 @@
+export const AUDIT_ACTIONS = [
+  'auth.login',
+  'auth.login_rejected',
+  'auth.logout',
+  'user.invite',
+  'user.remove',
+  'user.bootstrap',
+  'table.create',
+  'table.update',
+  'table.delete',
+  'table.import',
+  'table.export',
+  'column.create',
+  'column.update',
+  'column.delete',
+  'column.reorder',
+  'row.create',
+  'row.update',
+  'row.delete',
+  'token.create',
+  'token.revoke',
+  'token.rejected',
+  'api.read',
+] as const;
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -1,0 +1,30 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# Automatic HTTPS: Let's Encrypt for a real hostname, a local CA for "localhost".
+{$DOMAIN} {
+	encode zstd gzip
+
+	log {
+		output file /data/logs/access.log {
+			roll_size 50MiB
+			roll_keep 10
+		}
+		format json
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# API (admin + /api/v1 public) and its Swagger docs.
+	handle /api/* {
+		reverse_proxy backend:4000
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+}

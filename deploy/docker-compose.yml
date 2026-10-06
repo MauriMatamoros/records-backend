@@ -1,0 +1,62 @@
+# Full stack: Caddy (TLS + routing) → Next.js frontend and NestJS API.
+# Expects both repositories checked out side by side:
+#   records-backend/   (this repo; run compose from records-backend/deploy)
+#   records-frontend/
+name: records
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  backend:
+    build:
+      context: ..
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: file:/app/data/records.db
+      FRONTEND_URL: https://${DOMAIN:?Set DOMAIN in deploy/.env}
+      GOOGLE_CALLBACK_URL: https://${DOMAIN}/api/auth/google/callback
+      AUTH_DEV_LOGIN: "false"
+    volumes:
+      - records-data:/app/data
+    logging: *logging
+
+  frontend:
+    build:
+      context: ../../records-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    logging: *logging
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - backend
+    logging: *logging
+
+volumes:
+  # SQLite database. Back this up (see README).
+  records-data:
+  caddy-data:
+  caddy-config:

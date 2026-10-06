@@ -1,0 +1,110 @@
+// SQLite has no native JSON column type, so structured values (column options,
+// row cell data, audit details) are stored as JSON-encoded strings and
+// parsed/serialized in the service layer.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// A person allowed to sign in. Rows are created by invitation; Google OAuth
+/// only succeeds for emails that already exist here and match an allowed domain.
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  name        String?
+  avatarUrl   String?
+  invitedById String?
+  invitedBy   User?     @relation("UserInvites", fields: [invitedById], references: [id], onDelete: SetNull)
+  invitees    User[]    @relation("UserInvites")
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
+
+  apiTokens ApiToken[]
+}
+
+/// Read-only bearer token for internal services consuming the public API.
+/// Only the SHA-256 hash is stored; the raw token is shown once on creation.
+model ApiToken {
+  id          String    @id @default(cuid())
+  name        String
+  prefix      String
+  tokenHash   String    @unique
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+}
+
+model Table {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  columns     Column[]
+  rows        Row[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Column {
+  id       String  @id @default(cuid())
+  tableId  String
+  table    Table   @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  name     String
+  /// Stable machine key used in row data and the public API.
+  key      String
+  /// One of ColumnType (see src/tables/column-type.enum.ts).
+  type     String
+  /// JSON-encoded type-specific options, e.g. {"choices":["a","b"]}.
+  options  String?
+  order    Int
+  required Boolean @default(false)
+  /// Values must be distinct across the table's rows (enforced in RowsService).
+  unique   Boolean @default(false)
+  /// The table's primary key: at most one per table, always required + unique.
+  primary  Boolean @default(false)
+
+  @@unique([tableId, key])
+  @@index([tableId, order])
+}
+
+model Row {
+  id        String   @id @default(cuid())
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  /// JSON-encoded object keyed by Column.key.
+  data      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tableId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  /// USER | API_TOKEN | SYSTEM
+  actorType  String
+  actorId    String?
+  /// Email or token name, denormalized so entries stay readable after deletion.
+  actorLabel String?
+  action     String
+  entity     String?
+  entityId   String?
+  /// JSON-encoded details: payload summary or before/after diff.
+  detail     String?
+  ip         String?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([actorId])
+}

@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.env
+data/
+*.db
+*.db-journal
+/src/generated/prisma
+deploy/.env
+.claude/settings.local.json
+*.tsbuildinfo
+.DS_Store
